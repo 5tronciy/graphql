@@ -16,7 +16,6 @@ export const Profile = new GraphQLObjectType({
         _args,
         context: GraphQLContext
       ): Promise<MemberTypeData | null> => {
-        // Fixed: Query memberType table using memberTypeId, not profile table
         return await context.prisma.memberType.findUnique({
           where: { id: parent.memberTypeId },
         });
