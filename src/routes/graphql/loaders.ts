@@ -52,9 +52,15 @@ export function createLoaders(prisma: PrismaClient) {
       const map: Record<string, User[]> = {};
 
       for (const link of links) {
+        if (!link.author || !link.author.id) {
+          console.error('Missing author in link:', link);
+          continue;
+        }
+
         if (!map[link.subscriberId]) {
           map[link.subscriberId] = [];
         }
+
         map[link.subscriberId].push(link.author);
       }
 
@@ -74,9 +80,15 @@ export function createLoaders(prisma: PrismaClient) {
       const map: Record<string, User[]> = {};
 
       for (const link of links) {
+        if (!link.subscriber || !link.subscriber.id) {
+          console.error('Missing subscriber in link:', link);
+          continue;
+        }
+
         if (!map[link.authorId]) {
           map[link.authorId] = [];
         }
+
         map[link.authorId].push(link.subscriber);
       }
 

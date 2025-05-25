@@ -4,7 +4,9 @@ import { User } from './user.js';
 import { Post } from './post.js';
 import { Profile } from './profile.js';
 import { MemberType, MemberTypeIdEnum } from './memberType.js';
-import { GraphQLContext } from '../types/types.js';
+import { GraphQLContext, UserWithSubscriptions } from '../types/types.js';
+import { FieldsByTypeName, parseResolveInfo } from 'graphql-parse-resolve-info';
+import { Prisma } from '@prisma/client';
 
 export const RootQuery = new GraphQLObjectType({
   name: 'Query',
@@ -19,8 +21,47 @@ export const RootQuery = new GraphQLObjectType({
     },
     users: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(User))),
-      resolve: (_, __, { prisma }) =>
-        prisma.user.findMany(),
+      resolve: async (_, __, { prisma, loaders }, info) => {
+        const parsedInfo = parseResolveInfo(info);
+        const userFields = parsedInfo?.fieldsByTypeName?.User as FieldsByTypeName['User'];
+
+        const needsUserSubscribedTo = 'userSubscribedTo' in userFields;
+        const needsSubscribedToUser = 'subscribedToUser' in userFields;
+
+        const include: Prisma.UserFindManyArgs['include'] = {};
+        if (needsUserSubscribedTo) {
+          include.userSubscribedTo = {
+            include: { author: true },
+          };
+        }
+        if (needsSubscribedToUser) {
+          include.subscribedToUser = {
+            include: { subscriber: true },
+          };
+        }
+
+        const users: UserWithSubscriptions[] = await prisma.user.findMany({
+          ...(Object.keys(include).length > 0 ? { include } : {}),
+        });
+
+        for (const user of users) {
+          if (needsUserSubscribedTo && user.userSubscribedTo) {
+            loaders.userSubscribedToByUserId.prime(
+              user.id,
+              user.userSubscribedTo.map(link => link.author),
+            );
+          }
+
+          if (needsSubscribedToUser && user.subscribedToUser) {
+            loaders.subscribedToUserByUserId.prime(
+              user.id,
+              user.subscribedToUser.map(link => link.subscriber),
+            );
+          }
+        }
+
+        return users;
+      },
     },
     post: {
       type: Post,

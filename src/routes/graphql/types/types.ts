@@ -54,3 +54,16 @@ export type UserParent = {
   name: string;
   balance: number;
 };
+
+export interface UserWithSubscriptions extends User {
+  userSubscribedTo?: Array<{
+    subscriberId: string;
+    authorId: string;
+    author: User;
+  }>;
+  subscribedToUser?: Array<{
+    subscriberId: string;
+    authorId: string;
+    subscriber: User;
+  }>;
+}
