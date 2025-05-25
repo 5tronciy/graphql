@@ -12,42 +12,26 @@ export const User: GraphQLObjectType = new GraphQLObjectType({
     balance: { type: new GraphQLNonNull(GraphQLFloat) },
     profile: {
       type: Profile,
-      resolve: async (parent: UserParent, _, context: GraphQLContext): Promise<ProfileData | null> => {
-        return await context.prisma.profile.findUnique({
-          where: { userId: parent.id }
-        });
+      resolve: async (parent: UserParent, _, { loaders }: GraphQLContext): Promise<ProfileData | null> => {
+        return loaders.profileByUserId.load(parent.id);
       }
     },
     posts: {
       type: new GraphQLList(Post),
-      resolve: async (parent, _, { prisma }): Promise<PostData[] | null> => {
-        return await prisma.post.findMany({ where: { authorId: parent.id } });
+      resolve: async (parent, _, { loaders }: GraphQLContext): Promise<PostData[] | null> => {
+        return loaders.postsByAuthorId.load(parent.id);
       }
     },
     userSubscribedTo: {
       type: new GraphQLList(User),
-      resolve: async (parent: UserParent, _, { prisma }: GraphQLContext): Promise<UserData[] | null> => {
-        const subscriptions = await prisma.user.findMany({
-          where: {
-            subscribedToUser: {
-              some: { subscriberId: parent.id }
-            }
-          },
-        });
-        return subscriptions;
+      resolve: async (parent: UserParent, _, { loaders }: GraphQLContext): Promise<UserData[] | null> => {
+        return loaders.userSubscribedToByUserId.load(parent.id);
       }
     },
     subscribedToUser: {
       type: new GraphQLList(User),
-      resolve: async (parent: UserParent, _, { prisma }: GraphQLContext): Promise<UserData[] | null> => {
-        const subscriptions = await prisma.user.findMany({
-          where: {
-            userSubscribedTo: {
-              some: { authorId: parent.id }
-            }
-          },
-        });
-        return subscriptions;
+      resolve: async (parent: UserParent, _, { loaders }: GraphQLContext): Promise<UserData[] | null> => {
+        return loaders.subscribedToUserByUserId.load(parent.id);
       }
     },
   }),

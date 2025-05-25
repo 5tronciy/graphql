@@ -1,7 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { MemberType, Post, PrismaClient, Profile, User } from "@prisma/client";
+import DataLoader from "dataloader";
+
+interface Loaders {
+  postsByAuthorId: DataLoader<string, Post[]>;
+  profileByUserId: DataLoader<string, Profile | null>;
+  memberTypeById: DataLoader<string, MemberType | null>;
+  userSubscribedToByUserId: DataLoader<string, User[]>;
+  subscribedToUserByUserId: DataLoader<string, User[]>;
+}
 
 export type GraphQLContext = {
   prisma: PrismaClient;
+  loaders: Loaders;
 };
 
 export type ProfileParent = {

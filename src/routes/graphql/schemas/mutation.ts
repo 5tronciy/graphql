@@ -8,8 +8,6 @@ import { CreatePostInput, CreateProfileInput, CreateUserInput, UpdatePostInput, 
 import { handleMutationError } from "../helpers/handleError.js";
 import { validatePostInput, validateProfileInput, validateUserInput } from "../helpers/validate.js";
 
-
-
 export const Mutation = new GraphQLObjectType({
   name: 'Mutation',
   fields: {
