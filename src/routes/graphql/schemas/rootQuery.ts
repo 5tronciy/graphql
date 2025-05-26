@@ -1,12 +1,12 @@
+import { User as UserType } from '@prisma/client';
 import { GraphQLList, GraphQLNonNull, GraphQLObjectType } from 'graphql';
-import { UUIDType } from '../types/uuid.js';
-import { User } from './user.js';
+import { FieldsByTypeName, parseResolveInfo } from 'graphql-parse-resolve-info';
+import { MemberType, MemberTypeIdEnum } from './memberType.js';
 import { Post } from './post.js';
 import { Profile } from './profile.js';
-import { MemberType, MemberTypeIdEnum } from './memberType.js';
-import { GraphQLContext, UserWithSubscriptions } from '../types/types.js';
-import { FieldsByTypeName, parseResolveInfo } from 'graphql-parse-resolve-info';
-import { Prisma } from '@prisma/client';
+import { GraphQLContext } from '../types/types.js';
+import { UUIDType } from '../types/uuid.js';
+import { User } from './user.js';
 
 export const RootQuery = new GraphQLObjectType({
   name: 'Query',
@@ -28,35 +28,55 @@ export const RootQuery = new GraphQLObjectType({
         const needsUserSubscribedTo = 'userSubscribedTo' in userFields;
         const needsSubscribedToUser = 'subscribedToUser' in userFields;
 
-        const include: Prisma.UserFindManyArgs['include'] = {};
-        if (needsUserSubscribedTo) {
-          include.userSubscribedTo = {
-            include: { author: true },
-          };
-        }
-        if (needsSubscribedToUser) {
-          include.subscribedToUser = {
-            include: { subscriber: true },
-          };
-        }
-
-        const users: UserWithSubscriptions[] = await prisma.user.findMany({
-          ...(Object.keys(include).length > 0 ? { include } : {}),
+        const users = await prisma.user.findMany({
+          include: {
+            userSubscribedTo: needsUserSubscribedTo,
+            subscribedToUser: needsSubscribedToUser,
+          },
         });
 
-        for (const user of users) {
-          if (needsUserSubscribedTo && user.userSubscribedTo) {
-            loaders.userSubscribedToByUserId.prime(
-              user.id,
-              user.userSubscribedTo.map(link => link.author),
-            );
+        if (needsUserSubscribedTo) {
+          const subscriberToAuthorsMap: Record<string, UserType[]> = {};
+
+          for (const user of users) {
+            subscriberToAuthorsMap[user.id] = user.userSubscribedTo
+              .map((subscription) => {
+                const authorId = subscription.authorId;
+                return users.find((author) => author.id === authorId);
+              })
+              .filter((author): author is NonNullable<typeof author> => author !== undefined)
+              .map((author) => ({
+                id: author.id,
+                name: author.name,
+                balance: author.balance,
+              }));
           }
 
-          if (needsSubscribedToUser && user.subscribedToUser) {
-            loaders.subscribedToUserByUserId.prime(
-              user.id,
-              user.subscribedToUser.map(link => link.subscriber),
-            );
+          for (const [subscriberId, authors] of Object.entries(subscriberToAuthorsMap)) {
+            loaders.userSubscribedToByUserId.prime(subscriberId, authors);
+          }
+        }
+
+
+        if (needsSubscribedToUser) {
+          const authorToSubscribersMap: Record<string, Array<{ id: string; name: string; balance: number; }>> = {};
+
+          for (const user of users) {
+            authorToSubscribersMap[user.id] = user.subscribedToUser
+              .map((subscription) => {
+                const subscriberId = subscription.subscriberId;
+                return users.find((subscriber) => subscriber.id === subscriberId);
+              })
+              .filter((subscriber): subscriber is NonNullable<typeof subscriber> => subscriber !== undefined)
+              .map((subscriber) => ({
+                id: subscriber.id,
+                name: subscriber.name,
+                balance: subscriber.balance,
+              }));
+          }
+
+          for (const [authorId, subscribers] of Object.entries(authorToSubscribersMap)) {
+            loaders.subscribedToUserByUserId.prime(authorId, subscribers);
           }
         }
 
